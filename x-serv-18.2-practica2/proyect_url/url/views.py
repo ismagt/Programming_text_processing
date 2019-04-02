@@ -4,6 +4,7 @@ from django.http import HttpResponse, HttpResponseRedirect
 from .models import Url
 from django.views.decorators.csrf import csrf_exempt
 import socket
+from django.core.exceptions import ObjectDoesNotExist
 
 # Create your views here.
 
@@ -16,31 +17,36 @@ formulario1 = """
 	</form>
 """
 
-#~ pagina = """
-#~ <p>
-	#~ La URL original es : <a href= {urloriginal}> {urloriginal} </a>
-	#~ La URL acortada es : <a href= {urloriginal}> {urlacortada} </a>
-#~ </p>
-#~ """
-
 @csrf_exempt
 def formulario(request):
 	if request.method == "GET":
 		todos = Url.objects.all()
+		url_original = ""
+		url_acortada = ""
 		total = ""
 		for elements in todos:
-			total += elements.direccion + "<br>"
-		response = formulario1 + "Actualmente en la base de datos " + "<br>"+ total 
+			url_original = "La URL original es : " + elements.direccion 
+			url_acortada = "La URL acortada es : " + request.build_absolute_uri() + str(elements.id) 
+			total += url_original + "---->" + url_acortada + "<br>"
+		response = formulario1 + "Actualmente en la base de datos " + "<br>" + total
 	elif request.method == "POST":
-		url = Url(direccion=request.POST['key'])
-		url.save()
-		num = str(Url.objects.get(direccion=request.POST['key']))
-		print(num)
-		response = "La URL original es : " + str(request.POST['key']) + "<br>" + "La URL acortada es : " +  request.build_absolute_uri()  + num
+		protocolo = request.POST['key'].split("://")[0]
+		if protocolo == "https" or protocolo == "http":
+			url = Url(direccion = request.POST['key'])
+		else:
+			contenido = "http://" + request.POST['key']
+			url = Url(direccion = contenido)
+		try:
+			url = Url.objects.get(direccion = url.direccion)
+			response = "La URL original es : " + str(url.direccion) + "<br>" + "La URL acortada es : " +  request.build_absolute_uri() + str(url.id)
+		except Url.DoesNotExist:					
+			url.save()
+			num = str(url.id)
+			response = "La URL original es : " + str(url.direccion) + "<br>" + "La URL acortada es : " +  request.build_absolute_uri() + num			
 	return HttpResponse(response)
 
 def redirreccion (request, acortada):
-	url = Url.objects.get(id=acortada)
+	url = Url.objects.get(id = acortada)
 	direc = url.direccion
 	return  HttpResponseRedirect(direc)
 	
